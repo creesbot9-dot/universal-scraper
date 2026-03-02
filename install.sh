@@ -4,7 +4,7 @@ set -e
 # Universal Scraper Installer
 # One-liner: curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/master/install.sh | bash
 
-INSTALL_DIR="$HOME/.openclaw/workspace/skills/universal-scraper"
+INSTALL_DIR="/home/$USER/.openclaw/workspace/skills/universal-scraper"
 BIN_DIR="$HOME/.local/bin"
 COMMAND_NAME="scrape"
 
@@ -36,7 +36,7 @@ detect_arch() {
 
 add_to_path() {
     if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
-        echo "export PATH=\"\$PATH:$BIN_DIR\"" >> "$HOME/.bashrc"
+        echo "export PATH=\"$PATH:$BIN_DIR\"" >> "$HOME/.bashrc"
         export PATH="$PATH:$BIN_DIR"
         log_info "Added $BIN_DIR to PATH in ~/.bashrc"
     fi
@@ -84,13 +84,11 @@ main() {
     log_info "Installing Playwright browser..."
     npx playwright install chromium --with-deps 2>/dev/null || npx playwright install chromium
     
-    # Create wrapper script - FIX: use actual install dir
+    # Create wrapper script - FIXED
     log_info "Creating command wrapper..."
     cat > "$BIN_DIR/$COMMAND_NAME" << 'EOF'
 #!/bin/bash
-# Universal Scraper wrapper
-INSTALL_DIR="$HOME/.openclaw/workspace/skills/universal-scraper"
-cd "$INSTALL_DIR" && node scraper.js "$@"
+cd /home/$USER/.openclaw/workspace/skills/universal-scraper && node scraper.js "$@"
 EOF
     
     chmod +x "$BIN_DIR/$COMMAND_NAME"
