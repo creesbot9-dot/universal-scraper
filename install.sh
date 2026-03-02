@@ -4,7 +4,7 @@ set -e
 # Universal Scraper Installer
 # One-liner: curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/master/install.sh | bash
 
-INSTALL_DIR="$HOME/.local/share/universal-scraper"
+INSTALL_DIR="$HOME/.openclaw/workspace/skills/universal-scraper"
 BIN_DIR="$HOME/.local/bin"
 COMMAND_NAME="scrape"
 
@@ -89,7 +89,7 @@ main() {
     cat > "$BIN_DIR/$COMMAND_NAME" << 'EOF'
 #!/bin/bash
 # Universal Scraper wrapper
-INSTALL_DIR="$HOME/.local/share/universal-scraper"
+INSTALL_DIR="$HOME/.openclaw/workspace/skills/universal-scraper"
 cd "$INSTALL_DIR" && node scraper.js "$@"
 EOF
     
