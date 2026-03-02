@@ -493,7 +493,7 @@ async function attempt2FA(page, code) {
   
   return true;
 }
- * Looks for common login form indicators
+/* Looks for common login form indicators
  */
 async function detectLoginPage(page) {
   return await page.evaluate(() => {
