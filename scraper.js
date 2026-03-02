@@ -522,7 +522,10 @@ async function createAuthenticatedContext(session, options = {}) {
   return { browser, context, page };
 }
 
-async function scrape(url, options = {}) {
+/**
+ * Enhanced scrape with retry logic and better error handling for dynamic sites
+ */
+async function scrapeWithRetry(url, options = {}, retries = 2) {
   const { browser, context } = await createStealthContext({
     stealth: options.stealth,
     userAgent: options.userAgent,
@@ -541,55 +544,107 @@ async function scrape(url, options = {}) {
     await page.waitForTimeout(randomDelay(300, 800));
   }
   
-  try {
-    await page.goto(url, { 
-      waitUntil: options.stealth ? 'domcontentloaded' : 'networkidle', 
-      timeout: 30000 
-    });
-    
-    // Wait for network to settle in stealth mode
-    if (options.stealth) {
-      await page.waitForTimeout(randomDelay(500, 1500));
-    }
-    
-    // Custom wait if specified
-    if (options.wait) {
-      await page.waitForTimeout(options.wait);
-    }
-    
-    let results;
-    
-    if (options.selector) {
-      results = await extractSelector(page, options.selector);
-    } else {
-      results = await extractData(page);
-    }
-    
-    // Add stealth metadata if enabled
-    if (options.stealth) {
-      results._stealth = {
-        enabled: true,
-        userAgent: page.context().options?.userAgent || options.userAgent,
+  let lastError = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      // Wait before retry
+      if (attempt > 0) {
+        const retryDelay = Math.min(2000 * attempt, 8000);
+        await page.waitForTimeout(retryDelay);
+      }
+      
+      // Navigate with safer options for dynamic sites
+      const navOptions = { 
+        waitUntil: options.stealth ? 'domcontentloaded' : 'networkidle', 
+        timeout: options.timeout || 30000
       };
+      
+      // For dynamic sites, try to avoid navigation errors
+      if (options.stealth) {
+        // Use a more forgiving approach
+        navOptions.waitUntil = 'domcontentloaded';
+      }
+      
+      await page.goto(url, navOptions);
+      
+      // Wait for network to settle in stealth mode
+      if (options.stealth) {
+        await page.waitForTimeout(randomDelay(500, 1500));
+      }
+      
+      // Custom wait if specified (useful for dynamic content)
+      if (options.wait) {
+        await page.waitForTimeout(options.wait);
+      }
+      
+      // Wait for a specific element if requested (helps with SPAs)
+      if (options.waitForSelector) {
+        await page.waitForSelector(options.waitForSelector, { timeout: 10000 }).catch(() => {});
+      }
+      
+      let results;
+      
+      if (options.selector) {
+        results = await extractSelector(page, options.selector);
+      } else {
+        results = await extractData(page);
+      }
+      
+      // Add stealth metadata if enabled
+      if (options.stealth) {
+        results._stealth = {
+          enabled: true,
+          userAgent: page.context().options?.userAgent || options.userAgent,
+        };
+      }
+      
+      // Add session metadata if authenticated
+      if (options.session) {
+        results._session = {
+          platform: options.session,
+          authenticated: true,
+        };
+      }
+      
+      if (options.screenshot) {
+        await page.screenshot({ path: options.screenshot, fullPage: true });
+        console.error('Screenshot saved to:', options.screenshot);
+      }
+      
+      await browser.close();
+      return results;
+      
+    } catch (err) {
+      lastError = err;
+      
+      // Check for specific navigation/context errors
+      const errorMsg = err.message || '';
+      const isNavError = errorMsg.includes('Execution context was destroyed') ||
+                         errorMsg.includes('Navigation failed') ||
+                         errorMsg.includes('net::ERR_') ||
+                         errorMsg.includes('Timeout') ||
+                         errorMsg.includes('redirect');
+      
+      if (!isNavError || attempt >= retries) {
+        await browser.close();
+        throw err;
+      }
+      
+      // Retry on navigation errors
+      console.error(`[scraper] Navigation issue (attempt ${attempt + 1}/${retries + 1}), retrying...`);
     }
-    
-    // Add session metadata if authenticated
-    if (options.session) {
-      results._session = {
-        platform: options.session,
-        authenticated: true,
-      };
-    }
-    
-    if (options.screenshot) {
-      await page.screenshot({ path: options.screenshot, fullPage: true });
-      console.error('Screenshot saved to:', options.screenshot);
-    }
-    
-    return results;
-  } finally {
-    await browser.close();
   }
+  
+  await browser.close();
+  throw lastError;
+}
+
+/**
+ * Legacy scrape function - now wraps scrapeWithRetry
+ */
+async function scrape(url, options = {}) {
+  return scrapeWithRetry(url, options, options.retries || 2);
 }
 
 async function main() {
@@ -741,26 +796,29 @@ async function main() {
     console.error('Usage: node scraper.js <url> [options]');
     console.error('');
     console.error('Options:');
-    console.error('  --wait <ms>       Wait before extracting (default: 2000)');
-    console.error('  --selector <css>  Extract only matching CSS selector');
-    console.error('  --json            Output raw JSON');
-    console.error('  --screenshot      Save screenshot to screenshot.png');
+    console.error('  --wait <ms>          Wait before extracting (default: 2000)');
+    console.error('  --wait-for <selector> Wait for element to appear (helps dynamic sites)');
+    console.error('  --selector <css>     Extract only matching CSS selector');
+    console.error('  --json               Output raw JSON');
+    console.error('  --screenshot         Save screenshot to screenshot.png');
+    console.error('  --retries <n>        Number of retries on failure (default: 2)');
+    console.error('  --timeout <ms>       Page load timeout (default: 30000)');
     console.error('');
     console.error('Export Options:');
-    console.error('  --sheets <id>     Export data to Google Sheets (provide spreadsheet ID)');
+    console.error('  --sheets <id>        Export data to Google Sheets (provide spreadsheet ID)');
     console.error('  --sheets-tab <name>  Sheet tab name (default: "Sheet1")');
-    console.error('  --doc <name>      Export data to a Google Doc');
+    console.error('  --doc <name>         Export data to a Google Doc');
     console.error('');
     console.error('Stealth Options:');
-    console.error('  --stealth         Enable stealth mode (avoids bot detection)');
-    console.error('  --user-agent      Specify custom user agent');
-    console.error('  --proxy <url>     Use proxy server (e.g., http://proxy:port)');
+    console.error('  --stealth            Enable stealth mode (avoids bot detection)');
+    console.error('  --user-agent         Specify custom user agent');
+    console.error('  --proxy <url>        Use proxy server (e.g., http://proxy:port)');
     console.error('');
     console.error('Authentication:');
     console.error('  --login --platform <name> --user <user> --pass <pass>  Login and save session');
-    console.error('  --session <name>  Use saved session for authentication');
-    console.error('  --auto-refresh    Auto-refresh expired tokens');
-    console.error('  --sessions        List all saved sessions');
+    console.error('  --session <name>     Use saved session for authentication');
+    console.error('  --auto-refresh       Auto-refresh expired tokens');
+    console.error('  --sessions           List all saved sessions');
     console.error('');
     console.error('Site Learning:');
     console.error('  <url> --learn <name>    Learn a site and save its configuration');
@@ -784,6 +842,9 @@ async function main() {
     sheets: null,
     sheetsTab: 'Sheet1',
     doc: null,
+    retries: 2,
+    timeout: 30000,
+    waitForSelector: null,
   };
   
   // Parse flags
@@ -820,6 +881,15 @@ async function main() {
     } else if (args[i] === '--doc' && args[i + 1]) {
       options.doc = args[i + 1];
       i++;
+    } else if (args[i] === '--retries' && args[i + 1]) {
+      options.retries = parseInt(args[i + 1], 10) || 2;
+      i++;
+    } else if (args[i] === '--timeout' && args[i + 1]) {
+      options.timeout = parseInt(args[i + 1], 10) || 30000;
+      i++;
+    } else if (args[i] === '--wait-for' && args[i + 1]) {
+      options.waitForSelector = args[i + 1];
+      i++;
     }
   }
   
@@ -840,7 +910,21 @@ async function main() {
     // Output JSON (always, or based on json flag)
     console.log(JSON.stringify(data, null, 2));
   } catch (err) {
-    console.error('Error:', err.message);
+    const errorMsg = err.message || '';
+    
+    // Provide helpful error messages for common dynamic site issues
+    let hint = '';
+    if (errorMsg.includes('Execution context was destroyed') || 
+        errorMsg.includes('Navigation failed') ||
+        errorMsg.includes('redirect')) {
+      hint = '\n\n💡 Try adding --wait 3000 or --stealth for dynamic sites.';
+    } else if (errorMsg.includes('Timeout')) {
+      hint = '\n\n💡 Try increasing timeout with --timeout 60000 or add --wait-for <selector>.';
+    } else if (errorMsg.includes('net::ERR_')) {
+      hint = '\n\n💡 The site might be blocking requests. Try --stealth.';
+    }
+    
+    console.error('Scraper error:' + (hint ? hint : ` ${errorMsg}`));
     process.exit(1);
   }
 }
