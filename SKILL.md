@@ -3,30 +3,14 @@ name: universal-scraper
 description: |
   A powerful web scraper - just say "scrape [url]" and it extracts the data!
   Use when user wants to scrape any website, extract data, or learn a site for future.
-  No setup needed - just tell me what to scrape!
+  IMPORTANT: User MUST provide a specific URL. If user gives vague request like 
+  "top videos" or "trending news" without URL, ask for the URL first - do NOT 
+  try to use web_search or other tools. Just ask: "Please provide the URL you want to scrape."
 metadata:
   {
     "openclaw": {
       "emoji": "🕸️",
-      "requires": { "bins": ["scrape"] },
-      "install": [
-        {
-          "id": "manual",
-          "kind": "manual",
-          "label": "Install universal-scraper",
-          "bins": ["scrape"],
-          "setup": [
-            "mkdir -p ~/.openclaw/workspace/skills",
-            "cd ~/.openclaw/workspace/skills",
-            "git clone https://github.com/creesbot9-dot/universal-scraper2.git",
-            "cd universal-scraper2 && npm install && npx playwright install chromium",
-            "mkdir -p ~/.local/bin",
-            "cp universal-scraper2/scrape.sh ~/.local/bin/scrape",
-            "chmod +x ~/.local/bin/scrape",
-            "ln -sf ~/.local/bin/scrape ~/.npm-global/bin/scrape"
-          ]
-        }
-      ]
+      "requires": { "bins": ["scrape"] }
     }
   }
 ---
@@ -35,13 +19,20 @@ metadata:
 
 A powerful web scraper that works just like gog!
 
+## IMPORTANT - URL Required
+
+The scraper needs a **specific URL**. If user doesn't provide one, **ASK for it**.
+
+✅ Good: "Scrape https://news.ycombinator.com"
+✅ Good: "Scrape youtube.com/feed/trending"  
+❌ Bad: "Scrape top news" (no URL - ask for URL!)
+❌ Bad: "Find trending videos and scrape them" (need URL first)
+
 ## How It Works
 
 Just tell me: **"Scrape [url]"**
 
 Example: "Scrape https://news.ycombinator.com"
-
-I'll run the scraper and return the data!
 
 ---
 
@@ -58,39 +49,10 @@ I'll run the scraper and return the data!
 
 ## Setup (One Time)
 
-Run these commands:
-
 ```bash
-# 1. Clone the scraper
-mkdir -p ~/.openclaw/workspace/skills
-cd ~/.openclaw/workspace/skills
-git clone https://github.com/creesbot9-dot/universal-scraper.git
-
-# 2. Install dependencies
-cd universal-scraper
-npm install
-npx playwright install chromium
-
-# 3. Create scrape command in your PATH
-mkdir -p ~/.local/bin
-cp universal-scraper/scrape.sh ~/.local/bin/scrape
-chmod +x ~/.local/bin/scrape
-
-# 4. Link to npm-global for OpenClaw detection
-mkdir -p ~/.npm-global/bin
-ln -sf ~/.local/bin/scrape ~/.npm-global/bin/scrape
-
-# 5. Add to PATH (add to ~/.bashrc or ~/.zshrc)
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/master/install.sh | bash
 ```
 
 ---
-
-## Then Just Use!
-
-- "Scrape news.ycombinator.com"
-- "Learn youtube.com as yt"
-- "Use yt"
 
 That's it! 🕸️
