@@ -2,7 +2,7 @@
 # Universal Scraper CLI Wrapper
 # Place this in your PATH to use as: scrape <url> [options]
 
-SCRAPER_DIR="$HOME/.openclaw/workspace/skills/universal-scraper"
+SCRAPER_DIR="$HOME/.openclaw/workspace/skills/universal-scraper2"
 
 cd "$SCRAPER_DIR" || exit 1
 

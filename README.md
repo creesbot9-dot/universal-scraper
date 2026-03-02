@@ -16,7 +16,7 @@ A powerful web scraper that handles both static and JavaScript-heavy websites us
 ### Quick Install (Linux/macOS)
 
 ```bash
-curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/master/install.sh | bash
+curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper2/master/install.sh | bash
 ```
 
 This will:

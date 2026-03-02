@@ -8,16 +8,32 @@ metadata:
   {
     "openclaw": {
       "emoji": "🕸️",
-      "requires": {
-        "bins": ["node", "playwright"]
-      }
+      "requires": { "bins": ["scrape"] },
+      "install": [
+        {
+          "id": "manual",
+          "kind": "manual",
+          "label": "Install universal-scraper",
+          "bins": ["scrape"],
+          "setup": [
+            "mkdir -p ~/.openclaw/workspace/skills",
+            "cd ~/.openclaw/workspace/skills",
+            "git clone https://github.com/creesbot9-dot/universal-scraper2.git",
+            "cd universal-scraper2 && npm install && npx playwright install chromium",
+            "mkdir -p ~/.local/bin",
+            "cp universal-scraper2/scrape.sh ~/.local/bin/scrape",
+            "chmod +x ~/.local/bin/scrape",
+            "ln -sf ~/.local/bin/scrape ~/.npm-global/bin/scrape"
+          ]
+        }
+      ]
     }
   }
 ---
 
 # Universal Scraper
 
-A powerful web scraper that's easy to use!
+A powerful web scraper that works just like gog!
 
 ## How It Works
 
@@ -40,35 +56,41 @@ I'll run the scraper and return the data!
 
 ---
 
-## Installation
+## Setup (One Time)
 
-The scraper is already set up on this machine. No extra work needed!
+Run these commands:
+
+```bash
+# 1. Clone the scraper
+mkdir -p ~/.openclaw/workspace/skills
+cd ~/.openclaw/workspace/skills
+git clone https://github.com/creesbot9-dot/universal-scraper.git
+
+# 2. Install dependencies
+cd universal-scraper
+npm install
+npx playwright install chromium
+
+# 3. Create scrape command in your PATH
+mkdir -p ~/.local/bin
+cp universal-scraper/scrape.sh ~/.local/bin/scrape
+chmod +x ~/.local/bin/scrape
+
+# 4. Link to npm-global for OpenClaw detection
+mkdir -p ~/.npm-global/bin
+ln -sf ~/.local/bin/scrape ~/.npm-global/bin/scrape
+
+# 5. Add to PATH (add to ~/.bashrc or ~/.zshrc)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
 
 ---
 
-## Examples
+## Then Just Use!
 
-**Scrape a website:**
-- You: "Scrape reddit.com/r/gigs"
-- Me: *runs scraper* → returns data
+- "Scrape news.ycombinator.com"
+- "Learn youtube.com as yt"
+- "Use yt"
 
-**Learn a site:**
-- You: "Learn youtube.com as youtube"
-- Me: *saves site config*
-
-**Use learned site:**
-- You: "Use youtube"
-- Me: *returns latest data*
-
----
-
-## What I Extract
-
-- Titles
-- Links
-- Images
-- Prices
-- Text content
-- Headings
-
-That's it! Just tell me what to scrape! 🕸️
+That's it! 🕸️
