@@ -1,101 +1,74 @@
-# Universal Web Scraper Skill
+---
+name: universal-scraper
+description: |
+  A powerful web scraper - just say "scrape [url]" and it extracts the data!
+  Use when user wants to scrape any website, extract data, or learn a site for future.
+  No setup needed - just tell me what to scrape!
+metadata:
+  {
+    "openclaw": {
+      "emoji": "🕸️",
+      "requires": {
+        "bins": ["node", "playwright"]
+      }
+    }
+  }
+---
 
-A flexible web scraper that handles both static and JavaScript-heavy websites using Playwright.
+# Universal Scraper
+
+A powerful web scraper that's easy to use!
+
+## How It Works
+
+Just tell me: **"Scrape [url]"**
+
+Example: "Scrape https://news.ycombinator.com"
+
+I'll run the scraper and return the data!
+
+---
+
+## What You Can Say
+
+| What You Say | What I Do |
+|--------------|-----------|
+| "Scrape [url]" | Scrapes the website |
+| "Learn [url] as [name]" | Remembers site for later |
+| "Use [name]" | Uses saved site |
+| "List my sites" | Shows learned sites |
+
+---
 
 ## Installation
 
-```bash
-cd /home/creesler/.openclaw/workspace/skills/universal-scraper
-npm init -y
-npm install playwright
-npx playwright install chromium
-```
+The scraper is already set up on this machine. No extra work needed!
 
-## Usage
-
-### Basic URL Scraping
-
-```bash
-node scraper.js <url>
-```
-
-Examples:
-```bash
-node scraper.js https://old.reddit.com/r/programming
-node scraper.js https://craigslist.org
-node scraper.js https://boards.4chan.org/tech/
-```
-
-### Extract Specific Data
-
-The scraper extracts:
-- **title** - Page title
-- **url** - Current URL
-- **headings** - All h1-h6 headings with text
-- **links** - All links with href and text
-- **text** - Main body text content
-- **images** - Image URLs
-- **prices** - Detected price patterns ($, €, £, etc.)
-- **metadata** - Meta description, keywords, og: tags
-
-### Custom Extraction
-
-Edit `scraper.js` and modify the `extractData` function to add custom selectors:
-
-```javascript
-async function extractData(page, customSelectors) {
-  const data = await page.evaluate(() => {
-    // Add custom extraction logic here
-    return {
-      // Your custom fields
-    };
-  });
-  return data;
-}
-```
-
-## JavaScript-Heavy Sites
-
-The scraper automatically waits for network idle and can handle:
-- Single-page applications (SPAs)
-- Lazy-loaded content
-- Infinite scroll (requires custom logic)
-- Authentication-required pages (requires session cookies)
-
-### Waiting for Dynamic Content
-
-```javascript
-// Wait for specific element
-await page.waitForSelector('.dynamic-content');
-
-// Wait for network idle
-await page.waitForLoadState('networkidle');
-```
-
-## CLI Options
-
-| Flag | Description |
-|------|-------------|
-| `--wait <ms>` | Wait milliseconds before extracting |
-| `--selector <css>` | Extract only elements matching CSS selector |
-| `--json` | Output raw JSON (no formatting) |
-| `--screenshot` | Save screenshot to file |
+---
 
 ## Examples
 
-```bash
-# Scrape with custom wait time
-node scraper.js https://example.com --wait 3000
+**Scrape a website:**
+- You: "Scrape reddit.com/r/gigs"
+- Me: *runs scraper* → returns data
 
-# Extract only specific elements
-node scraper.js https://example.com --selector ".product-title"
+**Learn a site:**
+- You: "Learn youtube.com as youtube"
+- Me: *saves site config*
 
-# Output raw JSON
-node scraper.js https://example.com --json
-```
+**Use learned site:**
+- You: "Use youtube"
+- Me: *returns latest data*
 
-## Notes
+---
 
-- Some sites may block scraping; respect robots.txt and rate limits
-- For authenticated sites, pass cookies via `scraper.js` customization
-- Use `--screenshot` to debug visually
+## What I Extract
+
+- Titles
+- Links
+- Images
+- Prices
+- Text content
+- Headings
+
+That's it! Just tell me what to scrape! 🕸️
