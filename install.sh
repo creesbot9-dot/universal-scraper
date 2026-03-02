@@ -2,7 +2,7 @@
 set -e
 
 # Universal Scraper Installer
-# One-liner: curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/master/install.sh | bash
+# One-liner: curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper2/master/install.sh | bash
 
 INSTALL_DIR="$HOME/.local/share/universal-scraper"
 BIN_DIR="$HOME/.local/bin"
@@ -72,7 +72,7 @@ main() {
             log_info "Updated existing installation"
         else
             rm -rf "$INSTALL_DIR"
-            git clone --quiet https://github.com/creesbot9-dot/universal-scraper.git "$INSTALL_DIR"
+            git clone --quiet https://github.com/creesbot9-dot/universal-scraper2.git "$INSTALL_DIR"
             log_info "Cloned fresh copy"
         fi
     else
