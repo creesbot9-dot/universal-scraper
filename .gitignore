@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Screenshots
+*.png
+screenshots/
+
+# Session data
+sessions/*.json
+!sessions/.gitkeep
+
+# Learned sites
+learned-sites/*.json
+!learned-sites/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary
+*.tmp
