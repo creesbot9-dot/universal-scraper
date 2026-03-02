@@ -651,6 +651,21 @@ async function attemptLogin(page, loginInfo, credentials) {
       // Check if URL changed (successful login usually redirects)
       const currentUrl = page.url();
       console.error('[scraper] Post-login URL:', currentUrl);
+
+      // Save cookies for session persistence
+      const cookies = await page.context().cookies();
+      const sessionData = {
+        cookies: cookies,
+        url: currentUrl,
+        timestamp: Date.now()
+      };
+      const sessionDir = path.join(os.homedir(), ".openclaw/workspace/skills/universal-scraper/sessions");
+      fs.mkdirSync(sessionDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(sessionDir, "last-login.json"),
+        JSON.stringify(sessionData, null, 2)
+      );
+      console.error("[scraper] Session cookies saved for future requests");
       
       return true;
     } catch (e) {
@@ -881,6 +896,20 @@ async function createStealthContext(options = {}) {
     });
   }
 
+
+  // Load saved cookies if available
+  const sessionFile = path.join(os.homedir(), ".openclaw/workspace/skills/universal-scraper/sessions/last-login.json");
+  if (fs.existsSync(sessionFile)) {
+    try {
+      const sessionData = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
+      if (sessionData.cookies && sessionData.cookies.length > 0) {
+        await context.addCookies(sessionData.cookies);
+        console.error("[scraper] Loaded saved session cookies");
+      }
+    } catch (e) {
+      console.error("[scraper] Could not load session:", e.message);
+    }
+  }
   return { browser, context };
 }
 
