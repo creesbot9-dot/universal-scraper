@@ -86,9 +86,43 @@ Example: "Scrape https://news.ycombinator.com"
 | "Scrape [url] --wait 3000" | Waits 3 seconds before extracting |
 | "Scrape [url] --retries 3" | Retry up to 3 times on failure |
 | "Scrape [url] --wait-for #main" | Wait for element #main to appear |
+| "Scrape [url] --user myemail --pass mypass" | Auto-login if page requires authentication |
 | "Learn [url] as [name]" | Remembers site for later |
 | "Use [name]" | Uses saved site |
 | "List my sites" | Shows learned sites |
+
+---
+
+## Login Prompt Feature
+
+When scraping a page that requires login (like Rentvine or other auth-protected sites), the scraper will:
+
+1. **Detect login pages** - Automatically identifies password fields, login forms
+2. **Prompt for credentials** - If you provide `--user` and `--pass`, it will attempt login
+3. **Continue scraping** - After successful login, extracts the protected content
+
+### Example Usage
+
+```bash
+# Scrape a protected page with login
+scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword
+
+# Combine with stealth mode
+scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword --stealth
+```
+
+### How It Works
+
+1. The scraper loads the URL
+2. Analyzes the page for login form indicators (password field, username field, login button)
+3. If login page detected and credentials provided:
+   - Fills in username/email field
+   - Fills in password field  
+   - Clicks submit button
+   - Waits for redirect
+4. Extracts the post-login page content
+
+The scraper handles common login form patterns (email, username, login, password fields with various naming conventions).
 
 ---
 

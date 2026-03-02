@@ -288,6 +288,184 @@ const BLOCKED_DOMAINS = [
 ];
 
 /**
+ * Detect if the current page is a login page
+ * Looks for common login form indicators
+ */
+async function detectLoginPage(page) {
+  return await page.evaluate(() => {
+    const results = {
+      isLoginPage: false,
+      hasPasswordField: false,
+      hasUsernameField: false,
+      hasLoginForm: false,
+      loginButtonText: '',
+      formAction: '',
+      selectors: [],
+    };
+
+    // Check for password field
+    const passwordFields = document.querySelectorAll('input[type="password"]');
+    results.hasPasswordField = passwordFields.length > 0;
+
+    // Check for username/email fields (common patterns)
+    const usernameSelectors = [
+      'input[type="email"]',
+      'input[name*="user"]',
+      'input[name*="email"]',
+      'input[name*="login"]',
+      'input[id*="user"]',
+      'input[id*="email"]',
+      'input[id*="login"]',
+      'input[placeholder*="user"]',
+      'input[placeholder*="email"]',
+      'input[placeholder*="login"]',
+    ];
+    
+    for (const sel of usernameSelectors) {
+      const els = document.querySelectorAll(sel);
+      if (els.length > 0) {
+        results.hasUsernameField = true;
+        results.selectors.push(sel);
+        break;
+      }
+    }
+
+    // Check for login forms
+    const forms = document.querySelectorAll('form');
+    for (const form of forms) {
+      const formHTML = form.innerHTML.toLowerCase();
+      const hasPassword = form.querySelector('input[type="password"]');
+      const hasSubmit = form.querySelector('button, input[type="submit"]');
+      
+      if (hasPassword && hasSubmit) {
+        results.hasLoginForm = true;
+        results.formAction = form.action || '';
+        
+        // Get button text
+        const submitBtn = form.querySelector('button, input[type="submit"]');
+        if (submitBtn) {
+          results.loginButtonText = submitBtn.textContent?.trim() || submitBtn.value || '';
+        }
+        break;
+      }
+    }
+
+    // Check for common login page indicators in text/URL
+    const pageText = document.body.innerText.toLowerCase();
+    const loginKeywords = ['sign in', 'login', 'log in', 'password', 'username', 'email', 'signin'];
+    const url = window.location.href.toLowerCase();
+    
+    const loginUrlIndicators = url.includes('login') || url.includes('signin') || url.includes('auth');
+    const loginTextIndicators = loginKeywords.filter(k => pageText.includes(k)).length >= 2;
+
+    // Determine if it's a login page
+    results.isLoginPage = (
+      (results.hasPasswordField && results.hasUsernameField && results.hasLoginForm) ||
+      (results.hasPasswordField && loginTextIndicators) ||
+      (loginUrlIndicators && results.hasPasswordField)
+    );
+
+    return results;
+  });
+}
+
+/**
+ * Attempt to login to a page with provided credentials
+ */
+async function attemptLogin(page, loginInfo, credentials) {
+  const { username, password } = credentials;
+  
+  console.error('[scraper] Attempting login...');
+  
+  // Find and fill username field
+  const usernameSelectors = [
+    'input[type="email"]',
+    'input[name="username"]',
+    'input[name="email"]',
+    'input[name="login"]',
+    'input[id="username"]',
+    'input[id="email"]',
+    'input[id="login"]',
+    'input[name="user"]',
+    'input[id="user"]',
+  ];
+  
+  let usernameField = null;
+  for (const sel of usernameSelectors) {
+    const el = await page.$(sel);
+    if (el) {
+      usernameField = el;
+      break;
+    }
+  }
+  
+  if (usernameField) {
+    await usernameField.fill(username);
+    await page.waitForTimeout(300);
+  } else {
+    console.error('[scraper] Could not find username field');
+    return false;
+  }
+  
+  // Find and fill password field
+  const passwordField = await page.$('input[type="password"]');
+  if (passwordField) {
+    await passwordField.fill(password);
+    await page.waitForTimeout(300);
+  } else {
+    console.error('[scraper] Could not find password field');
+    return false;
+  }
+  
+  // Find and click submit button
+  const submitSelectors = [
+    'button[type="submit"]',
+    'input[type="submit"]',
+    'button:has-text("Sign")',
+    'button:has-text("Login")',
+    'button:has-text("Log")',
+    'button:has-text("Submit")',
+  ];
+  
+  let submitButton = null;
+  for (const sel of submitSelectors) {
+    const el = await page.$(sel);
+    if (el) {
+      submitButton = el;
+      break;
+    }
+  }
+  
+  if (submitButton) {
+    await submitButton.click();
+    console.error('[scraper] Clicked submit button, waiting for response...');
+    
+    // Wait for navigation or URL change
+    try {
+      await page.waitForTimeout(2000);
+      
+      // Check if URL changed (successful login usually redirects)
+      const currentUrl = page.url();
+      console.error('[scraper] Post-login URL:', currentUrl);
+      
+      return true;
+    } catch (e) {
+      console.error('[scraper] Wait after login failed:', e.message);
+    }
+  } else {
+    console.error('[scraper] Could not find submit button, trying form submit');
+    // Try to submit the form directly
+    await page.evaluate(() => {
+      const form = document.querySelector('form');
+      if (form) form.submit();
+    });
+    await page.waitForTimeout(2000);
+  }
+  
+  return true;
+}
+
+/**
  * Apply stealth patches to page using addInitScript (Playwright equivalent)
  */
 async function applyStealthPatches(page) {
@@ -583,6 +761,37 @@ async function scrapeWithRetry(url, options = {}, retries = 2) {
         await page.waitForSelector(options.waitForSelector, { timeout: 10000 }).catch(() => {});
       }
       
+      // Check for login page and handle if credentials provided
+      if (!options.session) { // Only check if not using existing session
+        const loginInfo = await detectLoginPage(page);
+        
+        if (loginInfo.isLoginPage) {
+          console.error('[scraper] Login page detected!');
+          console.error('[scraper]    Has password field:', loginInfo.hasPasswordField);
+          console.error('[scraper]    Has username field:', loginInfo.hasUsernameField);
+          console.error('[scraper]    Login button:', loginInfo.loginButtonText || '(not found)');
+          
+          // If credentials provided via options, try to login
+          if (options.username && options.password) {
+            console.error('[scraper] Attempting login with provided credentials...');
+            const loginSuccess = await attemptLogin(page, loginInfo, {
+              username: options.username,
+              password: options.password,
+            });
+            
+            if (loginSuccess) {
+              console.error('[scraper] Login successful! Extracting page data...');
+              // Give time for post-login content to load
+              await page.waitForTimeout(2000);
+            } else {
+              console.error('[scraper] Login may have failed, trying to extract anyway...');
+            }
+          } else {
+            console.error('[scraper] Credentials not provided. Use --user <username> --pass <password> to login.');
+          }
+        }
+      }
+      
       let results;
       
       if (options.selector) {
@@ -604,6 +813,14 @@ async function scrapeWithRetry(url, options = {}, retries = 2) {
         results._session = {
           platform: options.session,
           authenticated: true,
+        };
+      }
+      
+      // Add login metadata if credentials were used
+      if (options.username && options.password) {
+        results._login = {
+          attempted: true,
+          username: options.username,
         };
       }
       
@@ -820,6 +1037,10 @@ async function main() {
     console.error('  --auto-refresh       Auto-refresh expired tokens');
     console.error('  --sessions           List all saved sessions');
     console.error('');
+    console.error('Login Prompt (for pages requiring auth):');
+    console.error('  --user <username>    Username for login prompt');
+    console.error('  --pass <password>   Password for login prompt');
+    console.error('');
     console.error('Site Learning:');
     console.error('  <url> --learn <name>    Learn a site and save its configuration');
     console.error('  --use <name>            Use a learned site config to scrape');
@@ -845,6 +1066,8 @@ async function main() {
     retries: 2,
     timeout: 30000,
     waitForSelector: null,
+    username: null,
+    password: null,
   };
   
   // Parse flags
@@ -889,6 +1112,12 @@ async function main() {
       i++;
     } else if (args[i] === '--wait-for' && args[i + 1]) {
       options.waitForSelector = args[i + 1];
+      i++;
+    } else if (args[i] === '--user' && args[i + 1]) {
+      options.username = args[i + 1];
+      i++;
+    } else if (args[i] === '--pass' && args[i + 1]) {
+      options.password = args[i + 1];
       i++;
     }
   }
