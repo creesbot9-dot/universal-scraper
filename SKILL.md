@@ -99,7 +99,8 @@ When scraping a page that requires login (like Rentvine or other auth-protected 
 
 1. **Detect login pages** - Automatically identifies password fields, login forms
 2. **Prompt for credentials** - If you provide `--user` and `--pass`, it will attempt login
-3. **Continue scraping** - After successful login, extracts the protected content
+3. **Handle 2FA/verification** - If login triggers a 2FA page, provide `--code` to complete verification
+4. **Continue scraping** - After successful login/2FA, extracts the protected content
 
 ### Example Usage
 
@@ -107,8 +108,11 @@ When scraping a page that requires login (like Rentvine or other auth-protected 
 # Scrape a protected page with login
 scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword
 
+# Login with 2FA enabled
+scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword --code 123456
+
 # Combine with stealth mode
-scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword --stealth
+scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword --code 123456 --stealth
 ```
 
 ### How It Works
@@ -120,9 +124,22 @@ scrape https://rentvine.com/dashboard --user my@email.com --pass mypassword --st
    - Fills in password field  
    - Clicks submit button
    - Waits for redirect
-4. Extracts the post-login page content
+4. Checks if a 2FA/verification page is shown
+5. If 2FA required and `--code` provided:
+   - Finds the code input field (handles various naming conventions)
+   - Enters the verification code
+   - Submits and waits for verification
+6. Extracts the post-login page content
 
-The scraper handles common login form patterns (email, username, login, password fields with various naming conventions).
+### 2FA Detection
+
+The scraper automatically detects 2FA pages by looking for:
+- Keywords: "two-factor", "2FA", "verification", "OTP", "security code"
+- Input fields with names like: "code", "otp", "token", "verification", "pin"
+- Fields with maxlength 4-8 digits
+- Fields with autocomplete="one-time-code"
+
+If 2FA is triggered but no code is provided, the scraper will alert you and suggest using `--code <code>`.
 
 ---
 

@@ -288,7 +288,211 @@ const BLOCKED_DOMAINS = [
 ];
 
 /**
- * Detect if the current page is a login page
+ * Detect if the current page is a 2FA/verification page
+ * Looks for common 2FA form indicators
+ */
+async function detect2FAPage(page) {
+  return await page.evaluate(() => {
+    const results = {
+      is2FAPage: false,
+      hasCodeField: false,
+      hasOTPField: false,
+      hasVerificationField: false,
+      codeInputSelectors: [],
+      submitButtonText: '',
+    };
+
+    // Check for common 2FA/verification keywords in page text
+    const pageText = document.body.innerText.toLowerCase();
+    const pageHTML = document.body.innerHTML.toLowerCase();
+    
+    const twofaKeywords = ['two-factor', '2fa', '2fa', 'two factor', 'authentication', 'verification', 'verify', 'otp', 'one-time', 'onetime', 'security code', 'verification code'];
+    const has2FAText = twofaKeywords.some(k => pageText.includes(k));
+    
+    // Check for code input fields (4-8 digit input, common for OTP)
+    const inputs = document.querySelectorAll('input');
+    const codeInputs = [];
+    
+    for (const input of inputs) {
+      const name = (input.name || '').toLowerCase();
+      const id = (input.id || '').toLowerCase();
+      const placeholder = (input.placeholder || '').toLowerCase();
+      const type = input.type || 'text';
+      const autocomplete = input.getAttribute('autocomplete') || '';
+      const maxlength = input.getAttribute('maxlength') || '';
+      
+      // Look for code/OTP/verification fields
+      const isCodeField = (
+        name.includes('code') ||
+        name.includes('otp') ||
+        name.includes('verification') ||
+        name.includes('verify') ||
+        name.includes('token') ||
+        name.includes('pin') ||
+        id.includes('code') ||
+        id.includes('otp') ||
+        id.includes('verification') ||
+        id.includes('token') ||
+        placeholder.includes('code') ||
+        placeholder.includes('otp') ||
+        placeholder.includes('verification') ||
+        placeholder.includes('digit') ||
+        placeholder.includes('pin') ||
+        autocomplete === 'one-time-code' ||
+        autocomplete === 'otp' ||
+        (maxlength >= 4 && maxlength <= 8 && type === 'text') ||
+        (maxlength >= 4 && maxlength <= 8 && type === 'tel') ||
+        type === 'tel' && name.includes('phone')
+      );
+      
+      if (isCodeField && type !== 'hidden') {
+        codeInputs.push({
+          name: input.name,
+          id: input.id,
+          type: input.type,
+          maxlength: maxlength,
+          placeholder: input.placeholder,
+        });
+        results.hasCodeField = true;
+      }
+    }
+
+    results.codeInputSelectors = codeInputs;
+    results.hasOTPField = codeInputs.some(c => c.maxlength >= 4 && c.maxlength <= 8);
+    results.hasVerificationField = codeInputs.some(c => 
+      c.name?.toLowerCase().includes('verification') || 
+      c.name?.toLowerCase().includes('verify') ||
+      c.placeholder?.toLowerCase().includes('verification')
+    );
+
+    // Check for submit button
+    const submitBtn = document.querySelector('button[type="submit"], input[type="submit"]');
+    if (submitBtn) {
+      results.submitButtonText = submitBtn.textContent?.trim() || submitBtn.value || '';
+    }
+
+    // Determine if it's a 2FA page
+    results.is2FAPage = (
+      (results.hasCodeField && has2FAText) ||
+      (results.hasCodeField && codeInputs.length === 1) ||
+      (results.hasOTPField && has2FAText) ||
+      (results.hasVerificationField)
+    );
+
+    return results;
+  });
+}
+
+/**
+ * Attempt to enter 2FA code and submit
+ */
+async function attempt2FA(page, code) {
+  console.error('[scraper] 2FA page detected, entering code...');
+  
+  // Find code input field
+  const codeSelectors = [
+    'input[name="code"]',
+    'input[name="otp"]',
+    'input[name="token"]',
+    'input[name="verificationCode"]',
+    'input[name="verification_code"]',
+    'input[name="verify_code"]',
+    'input[name="2fa"]',
+    'input[name="two_factor_code"]',
+    'input[name="securityCode"]',
+    'input[id="code"]',
+    'input[id="otp"]',
+    'input[id="token"]',
+    'input[id="verificationCode"]',
+    'input[placeholder*="code"]',
+    'input[placeholder*="Code"]',
+    'input[placeholder*="OTP"]',
+    'input[placeholder*="verification"]',
+    'input[autocomplete="one-time-code"]',
+    'input[maxlength="6"]',
+    'input[maxlength="7"]',
+    'input[maxlength="8"]',
+    'input[type="tel"][maxlength]',
+  ];
+  
+  let codeField = null;
+  for (const sel of codeSelectors) {
+    const el = await page.$(sel);
+    if (el) {
+      codeField = el;
+      console.error('[scraper] Found 2FA input field with selector:', sel);
+      break;
+    }
+  }
+  
+  // Fallback: find any input that looks like a code field
+  if (!codeField) {
+    const inputs = await page.$$('input');
+    for (const input of inputs) {
+      const name = await input.getAttribute('name') || '';
+      const id = await input.getAttribute('id') || '';
+      const placeholder = await input.getAttribute('placeholder') || '';
+      const maxlength = await input.getAttribute('maxlength') || '';
+      const type = await input.getAttribute('type') || 'text';
+      
+      if ((maxlength >= 4 && maxlength <= 8 && type !== 'password') ||
+          name.toLowerCase().includes('code') ||
+          name.toLowerCase().includes('otp') ||
+          name.toLowerCase().includes('token') ||
+          placeholder.toLowerCase().includes('code') ||
+          placeholder.toLowerCase().includes('otp')) {
+        codeField = input;
+        console.error('[scraper] Found 2FA input field by fallback search');
+        break;
+      }
+    }
+  }
+  
+  if (!codeField) {
+    console.error('[scraper] Could not find 2FA code input field');
+    return false;
+  }
+  
+  // Enter the code
+  await codeField.fill(code);
+  await page.waitForTimeout(300);
+  console.error('[scraper] Entered 2FA code');
+  
+  // Find and click submit button
+  const submitSelectors = [
+    'button[type="submit"]',
+    'input[type="submit"]',
+    'button:has-text("Verify")',
+    'button:has-text("Submit")',
+    'button:has-text("Confirm")',
+    'button:has-text("Continue")',
+    'button:has-text("Login")',
+    'button:has-text("Sign")',
+  ];
+  
+  let submitButton = null;
+  for (const sel of submitSelectors) {
+    const el = await page.$(sel);
+    if (el) {
+      submitButton = el;
+      break;
+    }
+  }
+  
+  if (submitButton) {
+    await submitButton.click();
+    console.error('[scraper] Submitted 2FA code, waiting for verification...');
+    await page.waitForTimeout(2000);
+    return true;
+  }
+  
+  // Try pressing Enter
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(2000);
+  console.error('[scraper] Pressed Enter to submit 2FA code');
+  
+  return true;
+}
  * Looks for common login form indicators
  */
 async function detectLoginPage(page) {
@@ -780,8 +984,38 @@ async function scrapeWithRetry(url, options = {}, retries = 2) {
             });
             
             if (loginSuccess) {
-              console.error('[scraper] Login successful! Extracting page data...');
+              console.error('[scraper] Login submitted! Checking for 2FA requirement...');
               // Give time for post-login content to load
+              await page.waitForTimeout(1500);
+              
+              // Check if 2FA page after login
+              const twofaInfo = await detect2FAPage(page);
+              
+              if (twofaInfo.is2FAPage) {
+                console.error('[scraper] 2FA/verification page detected!');
+                console.error('[scraper]    Has code field:', twofaInfo.hasCodeField);
+                console.error('[scraper]    Submit button:', twofaInfo.submitButtonText || '(not found)');
+                
+                if (options.twoFactorCode) {
+                  console.error('[scraper] Attempting 2FA verification with provided code...');
+                  const twofaSuccess = await attempt2FA(page, options.twoFactorCode);
+                  
+                  if (twofaSuccess) {
+                    console.error('[scraper] 2FA verification submitted! Waiting for page...');
+                    await page.waitForTimeout(2000);
+                    console.error('[scraper] 2FA verification complete, extracting page data...');
+                  } else {
+                    console.error('[scraper] 2FA submission may have failed');
+                  }
+                } else {
+                  console.error('[scraper] 2FA code required but not provided.');
+                  console.error('[scraper] Use --code <code> to provide the 2FA/verification code.');
+                }
+              } else {
+                console.error('[scraper] Login successful! Extracting page data...');
+              }
+              
+              // Give more time for post-login/2FA content to load
               await page.waitForTimeout(2000);
             } else {
               console.error('[scraper] Login may have failed, trying to extract anyway...');
@@ -1040,6 +1274,7 @@ async function main() {
     console.error('Login Prompt (for pages requiring auth):');
     console.error('  --user <username>    Username for login prompt');
     console.error('  --pass <password>   Password for login prompt');
+    console.error('  --code <code>        2FA/verification code (if login triggers 2FA)');
     console.error('');
     console.error('Site Learning:');
     console.error('  <url> --learn <name>    Learn a site and save its configuration');
@@ -1068,6 +1303,7 @@ async function main() {
     waitForSelector: null,
     username: null,
     password: null,
+    twoFactorCode: null,
   };
   
   // Parse flags
@@ -1118,6 +1354,9 @@ async function main() {
       i++;
     } else if (args[i] === '--pass' && args[i + 1]) {
       options.password = args[i + 1];
+      i++;
+    } else if (args[i] === '--code' && args[i + 1]) {
+      options.twoFactorCode = args[i + 1];
       i++;
     }
   }
