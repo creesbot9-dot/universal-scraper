@@ -2,7 +2,7 @@
 set -e
 
 # Universal Scraper Installer
-# One-liner: curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/main/install.sh | bash
+# One-liner: curl -sL https://raw.githubusercontent.com/creesbot9-dot/universal-scraper/master/install.sh | bash
 
 INSTALL_DIR="$HOME/.local/share/universal-scraper"
 BIN_DIR="$HOME/.local/bin"
