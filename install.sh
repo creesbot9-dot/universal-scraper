@@ -84,12 +84,13 @@ main() {
     log_info "Installing Playwright browser..."
     npx playwright install chromium --with-deps 2>/dev/null || npx playwright install chromium
     
-    # Create wrapper script
+    # Create wrapper script - FIX: use actual install dir
     log_info "Creating command wrapper..."
     cat > "$BIN_DIR/$COMMAND_NAME" << 'EOF'
 #!/bin/bash
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR" && node scraper.js "$@"
+# Universal Scraper wrapper
+INSTALL_DIR="$HOME/.local/share/universal-scraper"
+cd "$INSTALL_DIR" && node scraper.js "$@"
 EOF
     
     chmod +x "$BIN_DIR/$COMMAND_NAME"
